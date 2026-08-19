@@ -1,5 +1,10 @@
 import { Resend } from "resend";
-import { CONFIG, route as routeTo, routeCc } from "@/lib/config";
+import {
+  CONFIG,
+  invoiceRecipients,
+  ccRecipients,
+  calendarInviteRecipients,
+} from "@/lib/config";
 import {
   generateInvoicePdf,
   buildInvoiceNumber,
@@ -70,6 +75,7 @@ export async function POST(request) {
     let emailStatus = "not_sent";
     let calendarStatus = "not_sent";
     let emailError = null;
+    let calendarError = null;
 
     if (process.env.RESEND_API_KEY) {
       const resend = new Resend(process.env.RESEND_API_KEY);
@@ -78,8 +84,8 @@ export async function POST(request) {
       try {
         const { error } = await resend.emails.send({
           from: `${CONFIG.fromName} <${CONFIG.fromEmail}>`,
-          to: routeTo(CONFIG.payee.email),
-          cc: routeCc(CONFIG.ccEmails),
+          to: invoiceRecipients(),
+          cc: ccRecipients(),
           replyTo: CONFIG.biller.email,
           subject: `Invoice ${invoiceNumber} — ${guestName}, ${stay}`,
           text: [
@@ -115,10 +121,14 @@ export async function POST(request) {
       }
 
       // --- 2. Calendar invite -> Jason + Ilona ---
+      // Resend's free tier allows 2 requests/second, so pause briefly —
+      // otherwise this second send can be rejected for rate limiting.
+      await new Promise((r) => setTimeout(r, 700));
+
       try {
         const { error } = await resend.emails.send({
           from: `${CONFIG.fromName} <${CONFIG.fromEmail}>`,
-          to: routeTo(CONFIG.calendarRecipients),
+          to: calendarInviteRecipients(),
           replyTo: CONFIG.biller.email,
           subject: `Room booked — ${guestName}, ${stay}`,
           text: [
@@ -140,13 +150,14 @@ export async function POST(request) {
           ],
         });
         calendarStatus = error ? "failed" : "sent";
-        if (error && !emailError) emailError = error.message || String(error);
+        if (error) calendarError = error.message || String(error);
       } catch (err) {
         calendarStatus = "failed";
-        if (!emailError) emailError = err.message;
+        calendarError = err.message;
       }
     } else {
       emailError = "RESEND_API_KEY is not set — invoice generated but not emailed.";
+      calendarError = emailError;
     }
 
     booking.emailStatus = emailStatus;
@@ -158,6 +169,11 @@ export async function POST(request) {
       emailStatus,
       calendarStatus,
       emailError,
+      calendarError,
+      invoiceSentTo: invoiceRecipients(),
+      ccSentTo: ccRecipients(),
+      calendarSentTo: calendarInviteRecipients(),
+      redirected: !!CONFIG.testRecipient || !!CONFIG.invoiceTo,
       testMode: !!CONFIG.testRecipient,
       pdfBase64: pdfBuffer.toString("base64"),
       icsBase64: Buffer.from(ics, "utf-8").toString("base64"),
