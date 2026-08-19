@@ -68,16 +68,24 @@ export default function Home() {
       if (!res.ok) throw new Error(data.error || "Something went wrong.");
 
       setBookings((b) => [...b, data.booking]);
+      const bothOk = data.emailStatus === "sent" && data.calendarStatus === "sent";
       setStatus({
-        type: data.emailStatus === "sent" ? "success" : "warn",
-        message:
-          data.emailStatus === "sent"
-            ? `Invoice ${data.booking.invoiceNumber} generated and emailed.`
-            : `Invoice ${data.booking.invoiceNumber} generated, but the email did not send. ${
-                data.emailError || ""
-              }`,
-        pdf: data.pdfBase64,
+        type: bothOk ? "success" : "warn",
         invoiceNumber: data.booking.invoiceNumber,
+        pdf: data.pdfBase64,
+        ics: data.icsBase64,
+        redirected: data.redirected,
+        invoiceSentTo: data.invoiceSentTo,
+        ccSentTo: data.ccSentTo,
+        calendarSentTo: data.calendarSentTo,
+        lines: [
+          data.emailStatus === "sent"
+            ? "Invoice email sent."
+            : `Invoice email did NOT send. ${data.emailError || ""}`,
+          data.calendarStatus === "sent"
+            ? "Calendar invite sent."
+            : `Calendar invite did NOT send. ${data.calendarError || ""}`,
+        ],
       });
       setForm({ guestName: "", guestEmail: "", checkIn: "", checkOut: "", notes: "" });
       setNightsOverride("");
@@ -88,12 +96,12 @@ export default function Home() {
     }
   }
 
-  function downloadPdf(base64, name) {
+  function downloadFile(base64, filename, mime) {
     const bytes = Uint8Array.from(atob(base64), (c) => c.charCodeAt(0));
-    const url = URL.createObjectURL(new Blob([bytes], { type: "application/pdf" }));
+    const url = URL.createObjectURL(new Blob([bytes], { type: mime }));
     const a = document.createElement("a");
     a.href = url;
-    a.download = `${name}.pdf`;
+    a.download = filename;
     a.click();
     URL.revokeObjectURL(url);
   }
@@ -211,15 +219,38 @@ export default function Home() {
                 : "border-red-200 bg-red-50 text-red-900"
             }`}
           >
-            <p>{status.message}</p>
-            {status.pdf && (
-              <button
-                onClick={() => downloadPdf(status.pdf, status.invoiceNumber)}
-                className="mt-2 font-medium underline underline-offset-2"
-              >
-                Download the PDF
-              </button>
+            <p className="font-medium">Invoice {status.invoiceNumber}</p>
+            <ul className="mt-1.5 space-y-1">
+              {(status.lines || [status.message]).map((l, i) => (
+                <li key={i}>· {l}</li>
+              ))}
+            </ul>
+            {status.redirected && (
+              <div className="mt-2 rounded bg-white/60 px-2 py-1.5 text-xs">
+                <p className="font-medium">Delivery (redirected):</p>
+                <p>Invoice → {(status.invoiceSentTo || []).join(", ") || "—"}</p>
+                <p>CC → {(status.ccSentTo || []).join(", ") || "none"}</p>
+                <p>Invite → {(status.calendarSentTo || []).join(", ") || "—"}</p>
+              </div>
             )}
+            <div className="mt-2 flex gap-4">
+              {status.pdf && (
+                <button
+                  onClick={() => downloadFile(status.pdf, status.invoiceNumber + ".pdf", "application/pdf")}
+                  className="font-medium underline underline-offset-2"
+                >
+                  Download the PDF
+                </button>
+              )}
+              {status.ics && (
+                <button
+                  onClick={() => downloadFile(status.ics, status.invoiceNumber + ".ics", "text/calendar")}
+                  className="font-medium underline underline-offset-2"
+                >
+                  Download the calendar file
+                </button>
+              )}
+            </div>
           </div>
         )}
 
@@ -254,7 +285,9 @@ export default function Home() {
                         b.emailStatus === "sent" ? "text-teal-700" : "text-amber-600"
                       }`}
                     >
-                      {b.emailStatus === "sent" ? "invoice sent" : "not emailed"}
+                      {b.emailStatus === "sent" ? "invoice sent" : "invoice failed"}
+                      {" · "}
+                      {b.calendarStatus === "sent" ? "invite sent" : "invite failed"}
                     </p>
                   </div>
                 </li>
