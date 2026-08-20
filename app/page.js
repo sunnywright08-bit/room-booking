@@ -8,7 +8,7 @@ function nightsBetween(a, b) {
   if (!a || !b) return 0;
   const d1 = new Date(a + "T00:00:00Z");
   const d2 = new Date(b + "T00:00:00Z");
-  const n = Math.round((d2 - d1) / 86400000) + 1;
+  const n = Math.round((d2 - d1) / 86400000);
   return n > 0 ? n : 0;
 }
 
