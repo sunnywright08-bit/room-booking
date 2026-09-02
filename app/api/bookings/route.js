@@ -13,7 +13,12 @@ import {
   formatLongDate,
 } from "@/lib/invoice";
 import { buildIcs } from "@/lib/calendar";
-import { getBookings, addBooking, hasClash } from "@/lib/store";
+import {
+  getBookings,
+  addBooking,
+  hasClash,
+  getStorageWarning,
+} from "@/lib/store";
 
 export async function GET() {
   const bookings = await getBookings();
@@ -168,6 +173,7 @@ export async function POST(request) {
       booking,
       emailStatus,
       calendarStatus,
+      storageWarning: getStorageWarning(),
       emailError,
       calendarError,
       invoiceSentTo: invoiceRecipients(),
@@ -179,6 +185,14 @@ export async function POST(request) {
       icsBase64: Buffer.from(ics, "utf-8").toString("base64"),
     });
   } catch (err) {
-    return Response.json({ error: err.message }, { status: 500 });
+    console.error("Booking failed:", err);
+    return Response.json(
+      {
+        error:
+          "Something went wrong creating this booking. Please try again, or contact the host directly.",
+        detail: err.message,
+      },
+      { status: 500 }
+    );
   }
 }
