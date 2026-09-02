@@ -74,6 +74,7 @@ export default function Home() {
         invoiceNumber: data.booking.invoiceNumber,
         pdf: data.pdfBase64,
         ics: data.icsBase64,
+        storageWarning: data.storageWarning,
         redirected: data.redirected,
         invoiceSentTo: data.invoiceSentTo,
         ccSentTo: data.ccSentTo,
@@ -225,6 +226,11 @@ export default function Home() {
                 <li key={i}>· {l}</li>
               ))}
             </ul>
+            {status.storageWarning && (
+              <p className="mt-2 rounded bg-white/60 px-2 py-1.5 text-xs">
+                Note: {status.storageWarning}
+              </p>
+            )}
             {status.redirected && (
               <div className="mt-2 rounded bg-white/60 px-2 py-1.5 text-xs">
                 <p className="font-medium">Delivery (redirected):</p>
